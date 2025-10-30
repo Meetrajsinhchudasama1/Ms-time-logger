@@ -1,0 +1,32 @@
+# Built application files
+*.apk
+*.ap_
+*.aab
+
+# Java / Kotlin
+*.class
+
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Local configuration
+local.properties
+
+# IntelliJ / Android Studio
+.idea/
+*.iml
+*.ipr
+*.iws
+.DS_Store
+
+# Keystore files
+*.jks
+*.keystore
+
+# Generated assets
+captures/
+
+# Kotlin specific
+*.kotlin_module
