@@ -140,12 +140,20 @@ class MainActivity : AppCompatActivity() {
             val inDate = timeFormat.parse(inTime)
             val outDate = timeFormat.parse(outTime)
             val diff = outDate.time - inDate.time
-            val minutes = TimeUnit.MILLISECONDS.toMinutes(diff)
-            "${minutes} min"
+            val totalMinutes = TimeUnit.MILLISECONDS.toMinutes(diff)
+            val hours = totalMinutes / 60
+            val minutes = totalMinutes % 60
+
+            if (hours > 0) {
+                String.format("%d hr %02d min", hours, minutes)
+            } else {
+                String.format("%d min", minutes)
+            }
         } catch (e: Exception) {
             "--"
         }
     }
+
 
     private fun saveTodayLog() {
         val file = File(getExternalFilesDir(null), fileName)
