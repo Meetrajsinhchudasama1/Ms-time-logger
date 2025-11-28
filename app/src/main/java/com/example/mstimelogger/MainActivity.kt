@@ -136,24 +136,23 @@ class MainActivity : AppCompatActivity() {
 
     private fun calculateDuration(inTime: String?, outTime: String?): String {
         if (inTime == null || outTime == null) return "--"
+
         return try {
             val inDate = timeFormat.parse(inTime)
             val outDate = timeFormat.parse(outTime)
             val diff = outDate.time - inDate.time
+
             val totalMinutes = TimeUnit.MILLISECONDS.toMinutes(diff)
             val hours = totalMinutes / 60
             val minutes = totalMinutes % 60
 
-            if (hours > 0) {
-                String.format("%d hr %02d min", hours, minutes)
-            } else {
-                String.format("%d min", minutes)
-            }
+            // Always return standard HH:MM format
+            String.format("%02d:%02d", hours, minutes)
+
         } catch (e: Exception) {
             "--"
         }
     }
-
 
     private fun saveTodayLog() {
         val file = File(getExternalFilesDir(null), fileName)
