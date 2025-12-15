@@ -38,15 +38,14 @@ class MainActivity : AppCompatActivity() {
 
     private var inTime: String? = null
     private var outTime: String? = null
-    private var minWorkMinutes: Int = 0  // minimum working time in minutes (same for all days)
+    private var minWorkMinutes: Int = 0
 
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (!isGranted) {
-            Toast.makeText(this, "Storage permission denied", Toast.LENGTH_SHORT).show()
+    private val requestPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+            if (!isGranted) {
+                Toast.makeText(this, "Storage permission denied", Toast.LENGTH_SHORT).show()
+            }
         }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,7 +63,6 @@ class MainActivity : AppCompatActivity() {
         loadMinWorkingHours()
         displayTodayLog()
 
-        // Add Time: IN then OUT
         addTimeButton.setOnClickListener {
             val currentTime = timeFormat.format(Date())
             if (inTime == null) {
@@ -83,24 +81,11 @@ class MainActivity : AppCompatActivity() {
             displayTodayLog()
         }
 
-        exportButton.setOnClickListener {
-            exportToExcel()
-        }
-
-        manageButton.setOnClickListener {
-            showManageDialog()
-        }
-
-        openExcelButton.setOnClickListener {
-            openExcelFile()
-        }
-
-        setMinWorkButton.setOnClickListener {
-            showMinWorkDialog()
-        }
+        exportButton.setOnClickListener { exportToExcel() }
+        manageButton.setOnClickListener { showManageDialog() }
+        openExcelButton.setOnClickListener { openExcelFile() }
+        setMinWorkButton.setOnClickListener { showMinWorkDialog() }
     }
-
-    // ---------------- Permissions ----------------
 
     private fun checkPermissions() {
         if (ContextCompat.checkSelfPermission(
@@ -111,8 +96,6 @@ class MainActivity : AppCompatActivity() {
             requestPermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         }
     }
-
-    // ---------------- SharedPreferences (IN/OUT + Min Work) ----------------
 
     private fun loadSavedTimes() {
         val prefs = getSharedPreferences("TimePrefs", MODE_PRIVATE)
@@ -147,18 +130,14 @@ class MainActivity : AppCompatActivity() {
         minWorkMinutes = totalMinutes
     }
 
-    // ---------------- Display ----------------
-
     private fun displayTodayLog() {
         val today = dateFormat.format(Date())
         val duration = calculateDuration(inTime, outTime)
         val minLeaveTime = calculateMinimumLeaveTime(inTime, minWorkMinutes)
 
         val (weekMinutes, monthMinutes) = calculateWeekAndMonthTotals()
-        val weekStr = formatMinutes(weekMinutes)
-        val monthStr = formatMinutes(monthMinutes)
 
-        val logText = """
+        logTextView.text = """
             Work Log:
             Date: $today
             In Time: ${inTime ?: "--"}
@@ -166,170 +145,89 @@ class MainActivity : AppCompatActivity() {
             Duration: $duration
             Minimum Leave Time: $minLeaveTime
 
-            Weekly Total: $weekStr
-            Monthly Total: $monthStr
+            Weekly Total: ${formatMinutes(weekMinutes)}
+            Monthly Total: ${formatMinutes(monthMinutes)}
         """.trimIndent()
-
-        logTextView.text = logText
     }
 
     private fun calculateDuration(inTime: String?, outTime: String?): String {
         if (inTime == null || outTime == null) return "--"
-        return try {
-            val inDate = timeFormat.parse(inTime)
-            val outDate = timeFormat.parse(outTime)
-            val diff = outDate.time - inDate.time
-            val totalMinutes = TimeUnit.MILLISECONDS.toMinutes(diff)
-            val hours = totalMinutes / 60
-            val minutes = totalMinutes % 60
-
-            if (hours > 0) {
-                String.format("%d hr %02d min", hours, minutes)
-            } else {
-                String.format("%d min", minutes)
-            }
-        } catch (e: Exception) {
-            "--"
-        }
+        val diff = timeFormat.parse(outTime)!!.time - timeFormat.parse(inTime)!!.time
+        val totalMinutes = TimeUnit.MILLISECONDS.toMinutes(diff)
+        val h = totalMinutes / 60
+        val m = totalMinutes % 60
+        return if (h > 0) "$h hr ${String.format("%02d", m)} min" else "$m min"
     }
 
     private fun calculateMinimumLeaveTime(inTime: String?, minWorkMinutes: Int): String {
         if (inTime == null || minWorkMinutes <= 0) return "--"
-        return try {
-            val inDate = timeFormat.parse(inTime) ?: return "--"
-            val cal = Calendar.getInstance()
-            cal.time = inDate
-            cal.add(Calendar.MINUTE, minWorkMinutes)
-            timeFormat.format(cal.time)
-        } catch (e: Exception) {
-            "--"
-        }
+        val cal = Calendar.getInstance()
+        cal.time = timeFormat.parse(inTime)!!
+        cal.add(Calendar.MINUTE, minWorkMinutes)
+        return timeFormat.format(cal.time)
     }
 
     private fun formatMinutes(totalMinutes: Long): String {
-        if (totalMinutes <= 0L) return "--"
-        val hours = totalMinutes / 60
-        val minutes = totalMinutes % 60
-        return if (hours > 0) {
-            String.format("%d hr %02d min", hours, minutes)
-        } else {
-            String.format("%d min", minutes)
-        }
+        if (totalMinutes <= 0) return "--"
+        val h = totalMinutes / 60
+        val m = totalMinutes % 60
+        return if (h > 0) "$h hr ${String.format("%02d", m)} min" else "$m min"
     }
-
-    // ---------------- Weekly & Monthly Totals (from Excel) ----------------
 
     private fun calculateWeekAndMonthTotals(): Pair<Long, Long> {
         val file = File(getExternalFilesDir(null), fileName)
         if (!file.exists()) return 0L to 0L
 
-        return try {
-            FileInputStream(file).use { fis ->
-                val workbook = WorkbookFactory.create(fis)
-                val sheet = workbook.getSheetAt(0)
+        var week = 0L
+        var month = 0L
+        val today = Calendar.getInstance().time
 
-                val todayCal = Calendar.getInstance()
-                val todayDate = todayCal.time
+        val weekStart = Calendar.getInstance().apply {
+            firstDayOfWeek = Calendar.MONDAY
+            set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+        }.time
 
-                val weekCal = Calendar.getInstance()
-                weekCal.firstDayOfWeek = Calendar.MONDAY
-                weekCal.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
-                weekCal.set(Calendar.HOUR_OF_DAY, 0)
-                weekCal.set(Calendar.MINUTE, 0)
-                weekCal.set(Calendar.SECOND, 0)
-                weekCal.set(Calendar.MILLISECOND, 0)
-                val startOfWeek = weekCal.time
+        val monthStart = Calendar.getInstance().apply {
+            set(Calendar.DAY_OF_MONTH, 1)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+        }.time
 
-                val monthCal = Calendar.getInstance()
-                monthCal.set(Calendar.DAY_OF_MONTH, 1)
-                monthCal.set(Calendar.HOUR_OF_DAY, 0)
-                monthCal.set(Calendar.MINUTE, 0)
-                monthCal.set(Calendar.SECOND, 0)
-                monthCal.set(Calendar.MILLISECOND, 0)
-                val startOfMonth = monthCal.time
-
-                var weekMinutes = 0L
-                var monthMinutes = 0L
-
-                for (i in 1..sheet.lastRowNum) {
-                    val row = sheet.getRow(i) ?: continue
-                    val dateCell = row.getCell(0) ?: continue
-                    val durationCell = row.getCell(3) ?: continue
-
-                    val dateStr = dateCell.stringCellValue ?: continue
-                    val durationStr = durationCell.stringCellValue
-
-                    val rowDate = try {
-                        dateFormat.parse(dateStr)
-                    } catch (e: Exception) {
-                        null
-                    } ?: continue
-
-                    val minutes = parseDurationToMinutes(durationStr)
-
-                    if (!rowDate.before(startOfWeek) && !rowDate.after(todayDate)) {
-                        weekMinutes += minutes
-                    }
-                    if (!rowDate.before(startOfMonth) && !rowDate.after(todayDate)) {
-                        monthMinutes += minutes
-                    }
-                }
-
-                workbook.close()
-                weekMinutes to monthMinutes
+        FileInputStream(file).use {
+            val sheet = WorkbookFactory.create(it).getSheetAt(0)
+            for (i in 1..sheet.lastRowNum) {
+                val row = sheet.getRow(i) ?: continue
+                val date = dateFormat.parse(row.getCell(0).stringCellValue) ?: continue
+                val minutes = parseDurationToMinutes(row.getCell(3).stringCellValue)
+                if (!date.before(weekStart) && !date.after(today)) week += minutes
+                if (!date.before(monthStart) && !date.after(today)) month += minutes
             }
-        } catch (e: Exception) {
-            0L to 0L
+        }
+        return week to month
+    }
+
+    private fun parseDurationToMinutes(d: String?): Long {
+        if (d.isNullOrBlank()) return 0
+        return when {
+            d.contains("hr") -> {
+                val parts = d.replace("hr", "").replace("min", "").trim().split(" ")
+                (parts[0].toLong() * 60) + (parts.getOrNull(1)?.toLong() ?: 0)
+            }
+            d.endsWith("min") -> d.replace("min", "").trim().toLong()
+            else -> 0
         }
     }
 
-    private fun parseDurationToMinutes(duration: String?): Long {
-        if (duration.isNullOrBlank() || duration == "--") return 0L
-        val d = duration.trim()
-        return try {
-            when {
-                d.contains("hr") -> {
-                    // e.g. "7 hr 15 min" or "7 hr"
-                    val regex = Regex("""(\d+)\s*hr\s*(\d+)\s*min""")
-                    val match = regex.find(d)
-                    if (match != null) {
-                        val hours = match.groupValues[1].toLong()
-                        val minutes = match.groupValues[2].toLong()
-                        hours * 60 + minutes
-                    } else {
-                        val hRegex = Regex("""(\d+)\s*hr""")
-                        val m = hRegex.find(d)
-                        m?.groupValues?.get(1)?.toLong()?.times(60) ?: 0L
-                    }
-                }
-
-                d.contains(":") -> {
-                    // e.g. "02:45"
-                    val parts = d.split(":")
-                    if (parts.size >= 2) {
-                        val hours = parts[0].toLongOrNull() ?: 0L
-                        val minutes = parts[1].toLongOrNull() ?: 0L
-                        hours * 60 + minutes
-                    } else 0L
-                }
-
-                d.endsWith("min") -> {
-                    d.removeSuffix("min").trim().toLongOrNull() ?: 0L
-                }
-
-                else -> d.toLongOrNull() ?: 0L
-            }
-        } catch (e: Exception) {
-            0L
-        }
-    }
-
-    // ---------------- Excel Save / Export / Open ----------------
+    // ===================== UPDATED PART =====================
 
     private fun saveTodayLog() {
         val file = File(getExternalFilesDir(null), fileName)
         val workbook = if (file.exists()) {
-            FileInputStream(file).use { fis -> WorkbookFactory.create(fis) }
+            FileInputStream(file).use { WorkbookFactory.create(it) }
         } else {
             XSSFWorkbook().apply {
                 createSheet("WorkLogs").createRow(0).apply {
@@ -348,7 +246,7 @@ class MainActivity : AppCompatActivity() {
         var rowFound = false
         for (i in 1..sheet.lastRowNum) {
             val row = sheet.getRow(i)
-            if (row.getCell(0).stringCellValue == today) {
+            if (row?.getCell(0)?.stringCellValue == today) {
                 row.getCell(1).setCellValue(inTime)
                 row.getCell(2).setCellValue(outTime)
                 row.getCell(3).setCellValue(duration)
@@ -358,87 +256,64 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (!rowFound) {
-            val newRow = sheet.createRow(sheet.lastRowNum + 1)
-            newRow.createCell(0).setCellValue(today)
-            newRow.createCell(1).setCellValue(inTime)
-            newRow.createCell(2).setCellValue(outTime)
-            newRow.createCell(3).setCellValue(duration)
+            val row = sheet.createRow(sheet.lastRowNum + 1)
+            row.createCell(0).setCellValue(today)
+            row.createCell(1).setCellValue(inTime)
+            row.createCell(2).setCellValue(outTime)
+            row.createCell(3).setCellValue(duration)
         }
 
-        FileOutputStream(file).use { fos -> workbook.write(fos) }
+        // ✅ ADD WEEK & MONTH TOTALS INTO EXCEL
+        if (isEndOfWeek()) {
+            val (weekMinutes, _) = calculateWeekAndMonthTotals()
+            appendTotalRowIfNeeded(sheet, "WEEK TOTAL", weekMinutes)
+        }
+
+        if (isEndOfMonth()) {
+            val (_, monthMinutes) = calculateWeekAndMonthTotals()
+            appendTotalRowIfNeeded(sheet, "MONTH TOTAL", monthMinutes)
+        }
+
+        FileOutputStream(file).use { workbook.write(it) }
         workbook.close()
     }
 
     private fun exportToExcel() {
         val file = File(getExternalFilesDir(null), fileName)
-        if (file.exists()) {
-            Toast.makeText(this, "Excel at:\n${file.absolutePath}", Toast.LENGTH_LONG).show()
-        } else {
-            Toast.makeText(this, "No log file found yet!", Toast.LENGTH_SHORT).show()
-        }
+        Toast.makeText(this, file.absolutePath, Toast.LENGTH_LONG).show()
     }
 
     private fun openExcelFile() {
         val file = File(getExternalFilesDir(null), fileName)
-        if (!file.exists()) {
-            Toast.makeText(this, "No Excel file found yet!", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        try {
-            val uri: Uri = FileProvider.getUriForFile(
-                this,
-                "${packageName}.provider",
-                file
-            )
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(
-                    uri,
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            startActivity(intent)
-        } catch (e: Exception) {
-            Toast.makeText(this, "No app found to open Excel file", Toast.LENGTH_LONG).show()
-        }
+        val uri = FileProvider.getUriForFile(this, "$packageName.provider", file)
+        startActivity(Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        })
     }
 
-    // ---------------- Manage Today Dialog ----------------
-
     private fun showManageDialog() {
-        val options = arrayOf("Edit In Time", "Edit Out Time", "Reset Today's Log")
         AlertDialog.Builder(this)
-            .setTitle("Manage Today's Log")
-            .setItems(options) { _, which ->
-                when (which) {
-                    0 -> showTimePicker(isInTime = true)
-                    1 -> showTimePicker(isInTime = false)
+            .setItems(arrayOf("Edit In Time", "Edit Out Time", "Reset Today's Log")) { _, i ->
+                when (i) {
+                    0 -> showTimePicker(true)
+                    1 -> showTimePicker(false)
                     2 -> resetTodayLog()
                 }
-            }
-            .show()
+            }.show()
     }
 
     private fun showTimePicker(isInTime: Boolean) {
-        val calendar = Calendar.getInstance()
-        val timeSetListener = TimePickerDialog.OnTimeSetListener { _, hour, minute ->
-            calendar.set(Calendar.HOUR_OF_DAY, hour)
-            calendar.set(Calendar.MINUTE, minute)
-            val selectedTime = timeFormat.format(calendar.time)
-            if (isInTime) inTime = selectedTime else outTime = selectedTime
+        val cal = Calendar.getInstance()
+        TimePickerDialog(this, { _, h, m ->
+            cal.set(Calendar.HOUR_OF_DAY, h)
+            cal.set(Calendar.MINUTE, m)
+            val t = timeFormat.format(cal.time)
+            if (isInTime) inTime = t else outTime = t
             saveTimesToPrefs()
             saveTodayLog()
             displayTodayLog()
-            Toast.makeText(this, "Time updated", Toast.LENGTH_SHORT).show()
-        }
-
-        TimePickerDialog(
-            this, timeSetListener,
-            calendar.get(Calendar.HOUR_OF_DAY),
-            calendar.get(Calendar.MINUTE),
-            false
-        ).show()
+        }, cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), false).show()
     }
 
     private fun resetTodayLog() {
@@ -446,40 +321,33 @@ class MainActivity : AppCompatActivity() {
         outTime = null
         saveTimesToPrefs()
         displayTodayLog()
-        Toast.makeText(this, "Today's log reset", Toast.LENGTH_SHORT).show()
     }
 
-    // ---------------- Set Minimum Working Hours ----------------
-
     private fun showMinWorkDialog() {
-        val initialHour = minWorkMinutes / 60
-        val initialMinute = minWorkMinutes % 60
+        TimePickerDialog(this, { _, h, m ->
+            saveMinWorkingHours(h * 60 + m)
+            displayTodayLog()
+        }, minWorkMinutes / 60, minWorkMinutes % 60, true).show()
+    }
 
-        val timeSetListener = TimePickerDialog.OnTimeSetListener { _, hourOfDay, minute ->
-            val total = hourOfDay * 60 + minute
-            if (total <= 0) {
-                Toast.makeText(
-                    this,
-                    "Minimum working time must be more than 0",
-                    Toast.LENGTH_SHORT
-                ).show()
-            } else {
-                saveMinWorkingHours(total)
-                Toast.makeText(
-                    this,
-                    "Minimum working time set to ${formatMinutes(total.toLong())}",
-                    Toast.LENGTH_SHORT
-                ).show()
-                displayTodayLog()
-            }
+    private fun isEndOfWeek() =
+        Calendar.getInstance().get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
+
+    private fun isEndOfMonth(): Boolean {
+        val c = Calendar.getInstance()
+        return c.get(Calendar.DAY_OF_MONTH) == c.getActualMaximum(Calendar.DAY_OF_MONTH)
+    }
+
+    private fun appendTotalRowIfNeeded(
+        sheet: org.apache.poi.ss.usermodel.Sheet,
+        label: String,
+        totalMinutes: Long
+    ) {
+        for (i in 0..sheet.lastRowNum) {
+            if (sheet.getRow(i)?.getCell(0)?.stringCellValue == label) return
         }
-
-        TimePickerDialog(
-            this,
-            timeSetListener,
-            initialHour,
-            initialMinute,
-            true
-        ).show()
+        val row = sheet.createRow(sheet.lastRowNum + 1)
+        row.createCell(0).setCellValue(label)
+        row.createCell(3).setCellValue(formatMinutes(totalMinutes))
     }
 }
