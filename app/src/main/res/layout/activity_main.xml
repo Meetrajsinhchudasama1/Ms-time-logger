@@ -2,66 +2,66 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="24dp"
+    android:background="#121212"
     android:gravity="center"
-    android:background="#121212">
+    android:orientation="vertical"
+    android:padding="24dp">
 
     <TextView
         android:id="@+id/logTextView"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Work Log"
-        android:textSize="18sp"
-        android:textColor="#FFFFFF"
-        android:padding="16dp"
-        android:background="#1E1E1E"
-        android:gravity="center"
         android:layout_marginBottom="24dp"
-        android:elevation="4dp" />
+        android:background="#1E1E1E"
+        android:elevation="4dp"
+        android:gravity="center"
+        android:padding="16dp"
+        android:text="Work Log"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp" />
 
     <Button
         android:id="@+id/addTimeButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Add Time"
+        android:layout_marginBottom="16dp"
         android:backgroundTint="#03DAC5"
-        android:textColor="#000000"
-        android:layout_marginBottom="16dp" />
+        android:text="Add Time"
+        android:textColor="#000000" />
 
     <Button
         android:id="@+id/exportButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Export Excel"
+        android:layout_marginBottom="16dp"
         android:backgroundTint="#BB86FC"
-        android:textColor="#000000"
-        android:layout_marginBottom="16dp" />
+        android:text="Export Excel"
+        android:textColor="#000000" />
 
     <Button
         android:id="@+id/openExcelButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Open Excel"
+        android:layout_marginBottom="16dp"
         android:backgroundTint="#4CAF50"
-        android:textColor="#000000"
-        android:layout_marginBottom="16dp" />
+        android:text="Open Excel"
+        android:textColor="#000000" />
 
     <Button
         android:id="@+id/manageButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Manage Today's Log"
+        android:layout_marginBottom="16dp"
         android:backgroundTint="#FFB74D"
-        android:textColor="#000000"
-        android:layout_marginBottom="16dp" />
+        android:text="Manage Today's Log"
+        android:textColor="#000000" />
 
     <Button
         android:id="@+id/setMinWorkButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Set Minimum Work Hours"
         android:backgroundTint="#90CAF9"
+        android:text="Set Minimum Work Hours"
         android:textColor="#000000" />
 
 </LinearLayout>
